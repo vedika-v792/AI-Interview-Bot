@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AI Interview Coach</title>
+  <meta name="description" content="Practice mock interviews with an AI-powered coach. Get real-time feedback on your answers for Software Engineer, Data Analyst, Product Manager, and General roles." />
+
+  <!-- Tailwind CSS via CDN (v3) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <script>
+    // Tailwind custom config
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: { sans: ['Inter', 'sans-serif'] },
+          colors: {
+            brand: {
+              50:  '#f0f4ff',
+              100: '#e0e9ff',
+              200: '#c7d7fe',
+              400: '#818cf8',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+              800: '#3730a3',
+              900: '#312e81',
+            },
+          },
+        },
+      },
+    };
+  </script>
+
+  <style>
+    /* ── Base ── */
+    body { font-family: 'Inter', sans-serif; }
+
+    /* ── Smooth scroll-to-bottom for chat ── */
+    #chat-messages { scroll-behavior: smooth; }
+
+    /* ── Typing indicator (three bouncing dots) ── */
+    .typing-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #818cf8;
+      animation: bounce 1.2s infinite ease-in-out;
+    }
+    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); }
+      40%            { transform: translateY(-8px); }
+    }
+
+    /* ── Chat bubble slide-in animations ── */
+    @keyframes slideInLeft {
+      from { opacity: 0; transform: translateX(-16px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    @keyframes slideInRight {
+      from { opacity: 0; transform: translateX(16px); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+    .bubble-bot  { animation: slideInLeft  0.35s ease-out; }
+    .bubble-user { animation: slideInRight 0.35s ease-out; }
+
+    /* ── Score ring ── */
+    .score-ring {
+      background: conic-gradient(
+        #6366f1 calc(var(--score-pct) * 1%),
+        #e0e9ff calc(var(--score-pct) * 1%)
+      );
+    }
+
+    /* ── Textarea auto-grow trick via grid ── */
+    .grow-wrap {
+      display: grid;
+    }
+    .grow-wrap::after {
+      content: attr(data-replicated-value) " ";
+      white-space: pre-wrap;
+      visibility: hidden;
+      grid-area: 1 / 1;
+      padding: 0.625rem 0.75rem;
+      font: inherit;
+      font-size: 0.875rem;
+      min-height: 44px;
+      max-height: 160px;
+      overflow: hidden;
+    }
+    .grow-wrap textarea {
+      resize: none;
+      overflow: hidden;
+      grid-area: 1 / 1;
+      max-height: 160px;
+      overflow-y: auto;
+    }
+
+    /* ── Progress bar fill ── */
+    #progress-bar-fill {
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* ── Markdown-lite: bold text inside bubbles ── */
+    .prose-lite strong { font-weight: 600; }
+    .prose-lite ul { list-style: disc; padding-left: 1.2rem; margin-top: 0.4rem; }
+    .prose-lite li { margin-bottom: 0.25rem; }
+  </style>
+</head>
+
+<body class="bg-gradient-to-br from-brand-900 via-brand-800 to-slate-900 min-h-screen text-white">
+
+  <!-- ════════════════════════════════════════════════════════════════
+       LANDING / SETUP SCREEN
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="setup-screen" class="flex flex-col items-center justify-center min-h-screen px-4 py-12">
+
+    <!-- Logo / Hero -->
+    <div class="mb-10 text-center">
+      <div class="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-brand-500/30 border border-brand-400/40 mb-5 shadow-xl backdrop-blur">
+        <!-- brain / AI icon (inline SVG) -->
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-brand-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M9.663 17h4.673M12 3v1m6.364 1.636-.707.707M21 12h-1M4 12H3m3.343-5.657-.707-.707m2.828 9.9a5 5 0 1 1 7.072 0l-.548.547A3.374 3.374 0 0 0 14 18.469V19a2 2 0 1 1-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547Z" />
+        </svg>
+      </div>
+      <h1 class="text-4xl sm:text-5xl font-bold tracking-tight text-white">AI Interview Coach</h1>
+      <p class="mt-3 text-brand-200/80 text-lg max-w-md mx-auto leading-relaxed">
+        Practice real interview questions, get instant expert feedback, and ace your next interview.
+      </p>
+    </div>
+
+    <!-- Setup card -->
+    <div class="w-full max-w-sm bg-white/10 border border-white/20 backdrop-blur-xl rounded-2xl p-8 shadow-2xl">
+
+      <!-- Role select -->
+      <label for="role-select" class="block text-sm font-semibold text-brand-100 mb-2">
+        Select Interview Role
+      </label>
+      <div class="relative mb-6">
+        <select
+          id="role-select"
+          class="w-full appearance-none bg-white/10 border border-white/25 text-white rounded-xl px-4 py-3 pr-10 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-brand-400 cursor-pointer"
+        >
+          <option value="Software Engineer"  class="text-slate-900">💻 Software Engineer</option>
+          <option value="Data Analyst"       class="text-slate-900">📊 Data Analyst</option>
+          <option value="Product Manager"    class="text-slate-900">🗂️ Product Manager</option>
+          <option value="General"            class="text-slate-900">🌐 General</option>
+        </select>
+        <!-- chevron icon -->
+        <svg class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-brand-200"
+             fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </div>
+
+      <!-- Feature highlights -->
+      <ul class="space-y-2 mb-7 text-sm text-brand-100/80">
+        <li class="flex items-center gap-2"><span class="text-brand-300">✓</span> 5 tailored interview questions</li>
+        <li class="flex items-center gap-2"><span class="text-brand-300">✓</span> Real-time feedback after each answer</li>
+        <li class="flex items-center gap-2"><span class="text-brand-300">✓</span> Final score &amp; improvement report</li>
+      </ul>
+
+      <!-- Start button -->
+      <button
+        id="start-btn"
+        onclick="startInterview()"
+        class="w-full bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-150 shadow-lg shadow-brand-700/40 flex items-center justify-center gap-2"
+      >
+        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+        </svg>
+        Start Interview
+      </button>
+
+      <!-- Error message area (setup screen) -->
+      <p id="setup-error" class="mt-4 text-red-300 text-sm text-center hidden"></p>
+    </div>
+
+    <!-- Subtle footer note -->
+    <p class="mt-8 text-xs text-brand-300/50">Powered by Neural Nexus · Your answers are never stored</p>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════════
+       INTERVIEW / CHAT SCREEN
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="interview-screen" class="hidden flex-col h-screen max-h-screen overflow-hidden">
+
+    <!-- Top bar -->
+    <header class="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-brand-900/80 backdrop-blur shrink-0">
+      <!-- Left: Role badge -->
+      <div class="flex items-center gap-2">
+        <span id="header-role" class="text-sm font-semibold text-brand-200 bg-brand-700/50 px-3 py-1 rounded-full"></span>
+      </div>
+
+      <!-- Centre: Progress -->
+      <div class="flex flex-col items-center gap-1">
+        <span id="progress-label" class="text-xs font-medium text-brand-300">Question 1 of 5</span>
+        <div class="w-32 h-1.5 bg-white/10 rounded-full overflow-hidden">
+          <div id="progress-bar-fill" class="h-full bg-brand-400 rounded-full" style="width: 20%"></div>
+        </div>
+      </div>
+
+      <!-- Right: Restart -->
+      <button
+        id="restart-btn"
+        onclick="restartInterview()"
+        class="text-xs text-brand-300 hover:text-white transition-colors px-2 py-1 rounded-lg hover:bg-white/10"
+        title="Restart interview"
+      >
+        ↩ Restart
+      </button>
+    </header>
+
+    <!-- Chat messages area -->
+    <main id="chat-messages" class="flex-1 overflow-y-auto px-4 py-6 space-y-4">
+      <!-- Bubbles are injected here by JS -->
+    </main>
+
+    <!-- Input area -->
+    <footer id="input-area" class="shrink-0 border-t border-white/10 bg-brand-900/80 backdrop-blur px-4 py-3">
+      <div class="max-w-3xl mx-auto flex items-end gap-3">
+        <!-- Auto-grow textarea wrapper -->
+        <div class="grow-wrap flex-1" id="grow-wrap">
+          <textarea
+            id="answer-input"
+            placeholder="Type your answer here…"
+            rows="1"
+            class="w-full bg-white/10 border border-white/20 text-white placeholder-white/40 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 resize-none"
+            oninput="this.parentElement.dataset.replicatedValue = this.value"
+            onkeydown="handleKeydown(event)"
+          ></textarea>
+        </div>
+        <!-- Send button -->
+        <button
+          id="send-btn"
+          onclick="submitAnswer()"
+          class="shrink-0 bg-brand-500 hover:bg-brand-600 active:scale-95 text-white rounded-xl p-3 transition-all duration-150 shadow shadow-brand-700/40 disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label="Send answer"
+        >
+          <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round"
+              d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
+          </svg>
+        </button>
+      </div>
+      <!-- API / network errors shown here -->
+      <p id="chat-error" class="mt-2 text-red-300 text-xs text-center hidden max-w-3xl mx-auto"></p>
+    </footer>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════════
+       FINAL SUMMARY SCREEN
+  ════════════════════════════════════════════════════════════════ -->
+  <div id="summary-screen" class="hidden flex-col items-center justify-start min-h-screen px-4 py-12 overflow-y-auto">
+
+    <div class="w-full max-w-xl">
+      <!-- Header -->
+      <div class="text-center mb-8">
+        <div class="inline-block text-4xl mb-3">🎉</div>
+        <h2 class="text-3xl font-bold text-white">Interview Complete!</h2>
+        <p class="text-brand-200/70 mt-2 text-sm">Here's a summary of your performance</p>
+      </div>
+
+      <!-- Score card -->
+      <div class="bg-white/10 border border-white/20 backdrop-blur-xl rounded-2xl p-6 mb-5 shadow-xl text-center">
+        <!-- Score ring -->
+        <div class="relative inline-flex items-center justify-center mb-4">
+          <div id="score-ring-el"
+               class="score-ring w-32 h-32 rounded-full flex items-center justify-center"
+               style="--score-pct: 0; padding: 6px;">
+            <div class="bg-brand-900 w-full h-full rounded-full flex flex-col items-center justify-center">
+              <span id="score-number" class="text-4xl font-bold text-white">—</span>
+              <span class="text-xs text-brand-300 font-medium">out of 10</span>
+            </div>
+          </div>
+        </div>
+
+        <p id="score-label" class="text-brand-200 font-semibold text-lg mb-1"></p>
+        <p class="text-brand-300/60 text-xs">Overall Performance Score</p>
+      </div>
+
+      <!-- Final summary text -->
+      <div class="bg-white/10 border border-white/20 backdrop-blur-xl rounded-2xl p-6 mb-5 shadow-xl">
+        <h3 class="text-sm font-semibold text-brand-200 uppercase tracking-wider mb-3">Detailed Feedback</h3>
+        <div id="summary-text" class="text-white/80 text-sm leading-relaxed space-y-2 prose-lite"></div>
+      </div>
+
+      <!-- Q&A Review accordion -->
+      <div class="bg-white/10 border border-white/20 backdrop-blur-xl rounded-2xl p-6 mb-8 shadow-xl">
+        <h3 class="text-sm font-semibold text-brand-200 uppercase tracking-wider mb-4">Question Review</h3>
+        <div id="review-list" class="space-y-3"></div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="flex gap-3 justify-center">
+        <button
+          onclick="restartInterview()"
+          class="flex-1 max-w-xs bg-brand-500 hover:bg-brand-600 active:scale-95 text-white font-semibold py-3 px-6 rounded-xl transition-all duration-150 shadow-lg shadow-brand-700/40"
+        >
+          ↩ Start New Interview
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ════════════════════════════════════════════════════════════════
+       JAVASCRIPT — Client-side state & API calls
+  ════════════════════════════════════════════════════════════════ -->
+  <script>
+    // ──────────────────────────────────────────────────────────────
+    // State
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * history: Array<{ question: string, answer: string, feedback: string }>
+     * The frontend is the source of truth for conversation history.
+     * We send the full array with every /api/answer request.
+     */
+    let state = {
+      role: 'Software Engineer',
+      currentQuestion: '',
+      currentQuestionNumber: 1,
+      history: [],    // completed Q&A pairs
+    };
+
+    // ──────────────────────────────────────────────────────────────
+    // Helpers
+    // ──────────────────────────────────────────────────────────────
+
+    function showScreen(id) {
+      ['setup-screen', 'interview-screen', 'summary-screen'].forEach(s => {
+        const el = document.getElementById(s);
+        if (s === id) {
+          el.classList.remove('hidden');
+          el.classList.add('flex');
+        } else {
+          el.classList.add('hidden');
+          el.classList.remove('flex');
+        }
+      });
+    }
+
+    function setLoading(loading) {
+      const sendBtn = document.getElementById('send-btn');
+      const input   = document.getElementById('answer-input');
+      sendBtn.disabled = loading;
+      input.disabled   = loading;
+    }
+
+    function showChatError(msg) {
+      const el = document.getElementById('chat-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 6000);
+    }
+
+    function showSetupError(msg) {
+      const el = document.getElementById('setup-error');
+      el.textContent = msg;
+      el.classList.remove('hidden');
+    }
+
+    /** Scroll chat to bottom. */
+    function scrollToBottom() {
+      const chat = document.getElementById('chat-messages');
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    /** Convert score 1-10 to a label string. */
+    function scoreLabel(score) {
+      if (score >= 9) return '🏆 Outstanding';
+      if (score >= 7) return '⭐ Strong Performer';
+      if (score >= 5) return '👍 Solid Effort';
+      if (score >= 3) return '📈 Room to Grow';
+      return '💪 Keep Practising';
+    }
+
+    /** Naive markdown-lite renderer (bold, bullet points, newlines). */
+    function renderMarkdown(text) {
+      let html = text
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')  // escape HTML
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')    // **bold**
+        .replace(/^• (.+)$/gm, '<li>$1</li>')                 // bullet •
+        .replace(/\n/g, '<br/>');                              // newlines
+
+      // Wrap consecutive <li> elements in a <ul>
+      html = html.replace(/(<li>.*?<\/li>)(<br\/>)?/gs, (m, li) => `<ul class="list-disc pl-4 mt-1 space-y-0.5">${li}</ul>`);
+      return html;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Progress bar
+    // ──────────────────────────────────────────────────────────────
+
+    function updateProgress(questionNumber) {
+      const pct = (questionNumber / 5) * 100;
+      document.getElementById('progress-bar-fill').style.width = `${pct}%`;
+      document.getElementById('progress-label').textContent =
+        `Question ${questionNumber} of 5`;
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Chat bubble creators
+    // ──────────────────────────────────────────────────────────────
+
+    /**
+     * Append a bot message bubble to the chat.
+     * @param {string} text      Markdown-lite text.
+     * @param {string} [badge]   Optional badge label (e.g. "Question 1").
+     */
+    function appendBotBubble(text, badge = '') {
+      const chat = document.getElementById('chat-messages');
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex items-start gap-3 bubble-bot max-w-3xl mx-auto w-full';
+
+      // Avatar
+      const avatar = document.createElement('div');
+      avatar.className =
+        'shrink-0 w-8 h-8 rounded-full bg-brand-500/40 border border-brand-400/50 flex items-center justify-center text-sm';
+      avatar.textContent = '🤖';
+
+      const content = document.createElement('div');
+      content.className = 'flex flex-col gap-1 max-w-[80%]';
+
+      if (badge) {
+        const b = document.createElement('span');
+        b.className = 'text-xs font-semibold text-brand-400 uppercase tracking-wider';
+        b.textContent = badge;
+        content.appendChild(b);
+      }
+
+      const bubble = document.createElement('div');
+      bubble.className =
+        'bg-white/10 border border-white/15 text-white/90 text-sm rounded-2xl rounded-tl-sm px-4 py-3 leading-relaxed prose-lite';
+      bubble.innerHTML = renderMarkdown(text);
+
+      content.appendChild(bubble);
+      wrapper.appendChild(avatar);
+      wrapper.appendChild(content);
+      chat.appendChild(wrapper);
+      scrollToBottom();
+    }
+
+    /**
+     * Append a user message bubble.
+     * @param {string} text
+     */
+    function appendUserBubble(text) {
+      const chat = document.getElementById('chat-messages');
+
+      const wrapper = document.createElement('div');
+      wrapper.className = 'flex items-start justify-end gap-3 bubble-user max-w-3xl mx-auto w-full';
+
+      const bubble = document.createElement('div');
+      bubble.className =
+        'bg-brand-600/70 border border-brand-400/30 text-white text-sm rounded-2xl rounded-tr-sm px-4 py-3 leading-relaxed max-w-[80%]';
+      bubble.textContent = text;
+
+      // User avatar
+      const avatar = document.createElement('div');
+      avatar.className =
+        'shrink-0 w-8 h-8 rounded-full bg-white/20 border border-white/30 flex items-center justify-center text-sm';
+      avatar.textContent = '🧑';
+
+      wrapper.appendChild(bubble);
+      wrapper.appendChild(avatar);
+      chat.appendChild(wrapper);
+      scrollToBottom();
+    }
+
+    /** Show an animated "typing…" indicator and return the element so it can be removed. */
+    function showTypingIndicator() {
+      const chat = document.getElementById('chat-messages');
+
+      const wrapper = document.createElement('div');
+      wrapper.id = 'typing-indicator';
+      wrapper.className = 'flex items-start gap-3 max-w-3xl mx-auto w-full';
+
+      const avatar = document.createElement('div');
+      avatar.className =
+        'shrink-0 w-8 h-8 rounded-full bg-brand-500/40 border border-brand-400/50 flex items-center justify-center text-sm';
+      avatar.textContent = '🤖';
+
+      const dots = document.createElement('div');
+      dots.className =
+        'flex items-center gap-1 bg-white/10 border border-white/15 rounded-2xl rounded-tl-sm px-4 py-3 h-10';
+      dots.innerHTML = `
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+        <div class="typing-dot"></div>
+      `;
+
+      wrapper.appendChild(avatar);
+      wrapper.appendChild(dots);
+      chat.appendChild(wrapper);
+      scrollToBottom();
+      return wrapper;
+    }
+
+    function removeTypingIndicator() {
+      const el = document.getElementById('typing-indicator');
+      if (el) el.remove();
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Keyboard shortcut: Shift+Enter = newline, Enter = submit
+    // ──────────────────────────────────────────────────────────────
+
+    function handleKeydown(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        submitAnswer();
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Start interview
+    // ──────────────────────────────────────────────────────────────
+
+    async function startInterview() {
+      const role = document.getElementById('role-select').value;
+      const btn  = document.getElementById('start-btn');
+
+      btn.disabled = true;
+      btn.textContent = 'Preparing interview…';
+      document.getElementById('setup-error').classList.add('hidden');
+
+      // Reset state
+      state = { role, currentQuestion: '', currentQuestionNumber: 1, history: [] };
+
+      try {
+        const res  = await fetch('/api/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ role }),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        state.currentQuestion       = data.question;
+        state.currentQuestionNumber = data.question_number;
+
+        // Switch to chat screen
+        document.getElementById('header-role').textContent = `🎙️ ${role}`;
+        document.getElementById('chat-messages').innerHTML  = '';
+        updateProgress(1);
+        showScreen('interview-screen');
+
+        // Show the first question
+        appendBotBubble(data.question, 'Question 1 of 5');
+        document.getElementById('answer-input').focus();
+
+      } catch (err) {
+        showSetupError(`❌ ${err.message}`);
+      } finally {
+        btn.disabled    = false;
+        btn.innerHTML   = `<svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+        </svg> Start Interview`;
+      }
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Submit answer
+    // ──────────────────────────────────────────────────────────────
+
+    async function submitAnswer() {
+      const input  = document.getElementById('answer-input');
+      const answer = input.value.trim();
+
+      if (!answer) return;  // don't submit empty answers
+
+      // Capture & clear input
+      input.value = '';
+      document.getElementById('grow-wrap').dataset.replicatedValue = '';
+
+      // Show user bubble
+      appendUserBubble(answer);
+      setLoading(true);
+
+      const typingEl = showTypingIndicator();
+
+      try {
+        const payload = {
+          role:            state.role,
+          question:        state.currentQuestion,
+          answer:          answer,
+          question_number: state.currentQuestionNumber,
+          history:         state.history,
+        };
+
+        const res = await fetch('/api/answer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: 'Unknown error' }));
+          throw new Error(err.detail || `HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+        removeTypingIndicator();
+
+        // Push completed Q&A+feedback into history
+        state.history.push({
+          question: state.currentQuestion,
+          answer:   answer,
+          feedback: data.feedback,
+        });
+
+        if (data.is_final) {
+          // ── Final question ──────────────────────────────────────
+          appendBotBubble(data.feedback, 'Feedback');
+          setTimeout(() => showSummaryScreen(data), 1200);
+
+        } else {
+          // ── Intermediate question ───────────────────────────────
+          appendBotBubble(data.feedback, 'Feedback');
+
+          // Short pause then show next question
+          setTimeout(() => {
+            state.currentQuestion       = data.next_question;
+            state.currentQuestionNumber = data.question_number;
+
+            updateProgress(data.question_number);
+            appendBotBubble(data.next_question, `Question ${data.question_number} of 5`);
+            setLoading(false);
+            document.getElementById('answer-input').focus();
+          }, 600);
+          return;  // don't fall through to setLoading(false) below
+        }
+
+      } catch (err) {
+        removeTypingIndicator();
+        showChatError(`❌ ${err.message}`);
+      }
+
+      setLoading(false);
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Summary screen
+    // ──────────────────────────────────────────────────────────────
+
+    function showSummaryScreen(data) {
+      // Score ring (CSS custom property trick)
+      const score = data.score || 5;
+      const pct   = (score / 10) * 100;
+      const ring  = document.getElementById('score-ring-el');
+      ring.style.setProperty('--score-pct', pct);
+      document.getElementById('score-number').textContent = score;
+      document.getElementById('score-label').textContent  = scoreLabel(score);
+
+      // Summary text
+      const summaryEl = document.getElementById('summary-text');
+      summaryEl.innerHTML = renderMarkdown(data.final_summary || 'Interview complete!');
+
+      // Q&A review list
+      const reviewEl = document.getElementById('review-list');
+      reviewEl.innerHTML = '';
+      state.history.forEach((item, i) => {
+        const card = document.createElement('details');
+        card.className =
+          'group bg-white/5 border border-white/10 rounded-xl overflow-hidden cursor-pointer';
+        card.innerHTML = `
+          <summary class="flex items-center justify-between px-4 py-3 text-sm font-medium text-brand-100 hover:bg-white/5 transition-colors list-none">
+            <span>Q${i + 1}: ${item.question.length > 60 ? item.question.slice(0, 60) + '…' : item.question}</span>
+            <svg class="w-4 h-4 text-brand-300 transition-transform group-open:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+          </summary>
+          <div class="px-4 pb-4 space-y-2 text-sm">
+            <p class="text-brand-200 font-semibold mt-2">Question</p>
+            <p class="text-white/70">${item.question}</p>
+            <p class="text-brand-200 font-semibold mt-2">Your Answer</p>
+            <p class="text-white/70">${item.answer}</p>
+            <p class="text-brand-200 font-semibold mt-2">Feedback</p>
+            <p class="text-white/70 prose-lite">${renderMarkdown(item.feedback)}</p>
+          </div>
+        `;
+        reviewEl.appendChild(card);
+      });
+
+      showScreen('summary-screen');
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Restart
+    // ──────────────────────────────────────────────────────────────
+
+    function restartInterview() {
+      state = { role: 'Software Engineer', currentQuestion: '', currentQuestionNumber: 1, history: [] };
+      document.getElementById('role-select').value = 'Software Engineer';
+      document.getElementById('setup-error').classList.add('hidden');
+      showScreen('setup-screen');
+    }
+
+    // ──────────────────────────────────────────────────────────────
+    // Init
+    // ──────────────────────────────────────────────────────────────
+    showScreen('setup-screen');
+  </script>
+</body>
+</html>
