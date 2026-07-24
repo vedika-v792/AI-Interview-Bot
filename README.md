@@ -1,6 +1,6 @@
 # AI Interview Coach 🎙️
 
-An AI-powered mock interview tool built with **FastAPI** + **Anthropic Claude**. Practice role-specific interview questions, get instant constructive feedback after each answer, and receive a final score with improvement areas after 5 questions.
+An AI-powered mock interview tool built with **FastAPI** + **Groq (Llama 3.3)**. Practice role-specific interview questions, get instant constructive feedback after each answer, and receive a final score with improvement areas after 5 questions.
 
 ---
 
@@ -15,21 +15,21 @@ An AI-powered mock interview tool built with **FastAPI** + **Anthropic Claude**.
                          │  HTTPS  (JSON over REST)
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│              FastAPI Backend  (Render / Docker)                 │
+│              FastAPI Backend  (Railway / Docker)                 │
 │                                                                 │
 │  GET  /          → serves index.html                            │
 │  POST /api/start → generates opening interview question         │
 │  POST /api/answer→ grades answer, returns next question OR      │
 │                    final summary + score                        │
 │                                                                 │
-│  ⚠️  ANTHROPIC_API_KEY is stored here ONLY — never sent to      │
+│  ⚠️  GROQ_API_KEY is stored here ONLY — never sent to           │
 │      the browser.                                               │
 └────────────────────────┬────────────────────────────────────────┘
-                         │  HTTPS  (Anthropic Messages API)
+                         │  HTTPS  (Groq API)
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Anthropic API                                │
-│              model: claude-3-5-sonnet-20241022                  │
+│                       Groq API                                  │
+│              model: llama-3.3-70b-versatile                     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -54,7 +54,7 @@ Each `/api/answer` request carries the full `history` array so the backend remai
 ### Prerequisites
 
 - Python 3.10+
-- An [Anthropic API key](https://console.anthropic.com/)
+- A [Groq API key](https://console.groq.com) (free, no billing required)
 
 ### 1 — Clone & install
 
@@ -75,8 +75,8 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# Open .env and fill in your Anthropic API key:
-#   ANTHROPIC_API_KEY=sk-ant-...
+# Open .env and fill in your Groq API key:
+#   GROQ_API_KEY=gsk_...
 ```
 
 ### 3 — Run
@@ -90,7 +90,7 @@ Interactive API docs are available at [http://localhost:8000/docs](http://localh
 
 ---
 
-## Deployment on Render
+## Deployment on Railway
 
 ### Step-by-step
 
@@ -101,27 +101,26 @@ Interactive API docs are available at [http://localhost:8000/docs](http://localh
    git push -u origin main
    ```
 
-2. **Create a Render Web Service**
-   - Go to [render.com](https://render.com) → **New → Web Service**
-   - Connect your GitHub repo
-   - Set **Runtime** to `Python 3`
+2. **Create a Railway project**
+   - Go to [railway.app](https://railway.app) → **New Project → Deploy from GitHub repo**
+   - Connect your GitHub account and select your repo
 
-3. **Build & Start commands**
-   | Setting | Value |
-   |---------|-------|
-   | Build Command | `pip install -r requirements.txt` |
-   | Start Command | `uvicorn main:app --host 0.0.0.0 --port 8000` |
+3. **Railway auto-detects the `Procfile`** and uses it as the start command:
+   ```
+   web: uvicorn main:app --host 0.0.0.0 --port $PORT
+   ```
+   No manual build or start command configuration needed.
 
-4. **Environment variables** — add these in the Render dashboard under *Environment*:
+4. **Environment variables** — add these in the Railway dashboard under *Variables*:
 
    | Key | Value |
    |-----|-------|
-   | `ANTHROPIC_API_KEY` | `sk-ant-...` |
-   | `ALLOWED_ORIGINS` | `https://your-app-name.onrender.com` |
+   | `GROQ_API_KEY` | `gsk_...` |
+   | `ALLOWED_ORIGINS` | `https://your-app-name.up.railway.app` |
 
-5. **Deploy** — click *Create Web Service*. Render will build and deploy automatically on every push to `main`.
+5. **Deploy** — Railway deploys automatically on every push to `main`.
 
-> **Tip:** Render's free tier spins down after inactivity. The first request after idle may take ~30 s. Upgrade to a paid instance type to avoid cold starts in production.
+> **Tip:** Railway's free tier (Hobby plan) keeps your app running without cold starts — unlike Render's free tier which spins down after inactivity.
 
 ---
 
@@ -132,12 +131,12 @@ Build and run locally with Docker:
 ```bash
 docker build -t interview-coach .
 docker run -p 8000:8000 \
-  -e ANTHROPIC_API_KEY=sk-ant-... \
+  -e GROQ_API_KEY=gsk_... \
   -e ALLOWED_ORIGINS=http://localhost:8000 \
   interview-coach
 ```
 
-> **AWS App Runner alternative:** The same `Dockerfile` can be deployed directly via [AWS App Runner](https://aws.amazon.com/apprunner/). Push the image to ECR, create an App Runner service pointing to it, and inject `ANTHROPIC_API_KEY` + `ALLOWED_ORIGINS` as App Runner environment variables. App Runner auto-scales and handles TLS termination out of the box — a strong production alternative to Render.
+> **AWS App Runner alternative:** The same `Dockerfile` can be deployed directly via [AWS App Runner](https://aws.amazon.com/apprunner/). Push the image to ECR, create an App Runner service pointing to it, and inject `GROQ_API_KEY` + `ALLOWED_ORIGINS` as App Runner environment variables. App Runner auto-scales and handles TLS termination out of the box — a strong production alternative to Railway.
 
 ---
 
@@ -150,6 +149,7 @@ my-interview-bot/
 │   └── index.html       # Single-page frontend (Tailwind CDN + vanilla JS)
 ├── static/              # Optional: extra JS/CSS assets
 ├── requirements.txt
+├── Procfile             # Railway start command: uvicorn main:app --host 0.0.0.0 --port $PORT
 ├── .env.example         # Template — copy to .env and fill in secrets
 ├── .gitignore           # Excludes .env, __pycache__, venvs, etc.
 ├── Dockerfile           # Python 3.12-slim, uvicorn on port 8000
